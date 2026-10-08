@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI Chatbot</title>
+<style>
+*{box-sizing:border-box}
+body{
+    margin:0;
+    font-family:Arial,Helvetica,sans-serif;
+    background:linear-gradient(135deg,#667eea,#764ba2);
+    height:100vh;
+    display:flex;
+    justify-content:center;
+    align-items:center;
+}
+.chat{
+    width:min(900px,94vw);
+    height:min(760px,92vh);
+    background:#fff;
+    border-radius:22px;
+    overflow:hidden;
+    display:flex;
+    flex-direction:column;
+    box-shadow:0 20px 60px rgba(0,0,0,.28);
+}
+.header{
+    height:72px;
+    padding:14px 20px;
+    display:flex;
+    align-items:center;
+    gap:12px;
+    border-bottom:1px solid #eee;
+}
+.avatar{
+    width:44px;height:44px;border-radius:50%;
+    display:flex;align-items:center;justify-content:center;
+    color:white;font-size:21px;
+    background:linear-gradient(135deg,#667eea,#764ba2);
+}
+.title{font-size:18px;font-weight:700}
+.status{font-size:12px;color:#22a447;margin-top:3px}
+.new{
+    margin-left:auto;border:0;background:#f1f3f5;
+    padding:10px 14px;border-radius:10px;cursor:pointer;
+}
+.messages{
+    flex:1;padding:24px;overflow-y:auto;background:#f7f7f8;
+}
+.row{display:flex;margin:12px 0}
+.row.user{justify-content:flex-end}
+.bubble{
+    max-width:78%;padding:13px 16px;border-radius:17px;
+    line-height:1.55;white-space:pre-wrap;overflow-wrap:anywhere;
+}
+.bot .bubble{background:#fff;border:1px solid #e5e5e5}
+.user .bubble{background:#667eea;color:#fff}
+.typing{opacity:.65}
+.input-area{
+    display:flex;gap:10px;padding:14px;border-top:1px solid #eee;
+}
+textarea{
+    flex:1;resize:none;height:48px;border:1px solid #ddd;
+    border-radius:13px;padding:13px;font:inherit;outline:none;
+}
+textarea:focus{border-color:#667eea}
+.send{
+    border:0;background:#667eea;color:white;border-radius:13px;
+    padding:0 20px;font-weight:600;cursor:pointer;
+}
+.send:disabled{opacity:.6;cursor:not-allowed}
+.empty{text-align:center;color:#888;margin-top:18vh}
+@media(max-width:600px){
+    .chat{height:100vh;width:100vw;border-radius:0}
+    .bubble{max-width:88%}
+}
+</style>
+</head>
+<body>
+<div class="chat">
+    <div class="header">
+        <div class="avatar">🤖</div>
+        <div>
+            <div class="title">AI Chatbot</div>
+            <div class="status">● Online</div>
+        </div>
+        <button class="new" onclick="newChat()">＋ Cuộc trò chuyện mới</button>
+    </div>
+
+    <div class="messages" id="messages">
+        <div class="empty" id="empty">
+            <div style="font-size:42px">🤖</div>
+            <h2>Xin chào!</h2>
+            <p>Hãy đặt câu hỏi để bắt đầu trò chuyện.</p>
+        </div>
+    </div>
+
+    <div class="input-area">
+        <textarea id="input" placeholder="Nhập câu hỏi..." onkeydown="handleKey(event)"></textarea>
+        <button class="send" id="send" onclick="sendMessage()">Gửi</button>
+    </div>
+</div>
+
+<script>
+let messages = [];
+
+function addMessage(role, content, temporary=false){
+    const box = document.getElementById("messages");
+    const empty = document.getElementById("empty");
+    if(empty) empty.remove();
+
+    const row = document.createElement("div");
+    row.className = "row " + role;
+
+    const bubble = document.createElement("div");
+    bubble.className = "bubble" + (temporary ? " typing" : "");
+    bubble.textContent = content;
+
+    row.appendChild(bubble);
+    box.appendChild(row);
+    box.scrollTop = box.scrollHeight;
+    return row;
+}
+
+async function sendMessage(){
+    const input = document.getElementById("input");
+    const send = document.getElementById("send");
+    const text = input.value.trim();
+    if(!text || send.disabled) return;
+
+    input.value = "";
+    messages.push({role:"user", content:text});
+    addMessage("user", text);
+
+    const typing = addMessage("bot", "AI đang suy nghĩ...", true);
+    send.disabled = true;
+
+    try{
+        const response = await fetch("/chat", {
+            method:"POST",
+            headers:{"Content-Type":"application/json"},
+            body:JSON.stringify({messages:messages})
+        });
+
+        const data = await response.json();
+
+        if(!response.ok) throw new Error(data.error || "Có lỗi xảy ra.");
+
+        typing.remove();
+        addMessage("bot", data.reply);
+        messages.push({role:"assistant", content:data.reply});
+    }catch(error){
+        typing.remove();
+        addMessage("bot", "❌ " + error.message);
+    }finally{
+        send.disabled = false;
+        input.focus();
+    }
+}
+
+function handleKey(event){
+    if(event.key === "Enter" && !event.shiftKey){
+        event.preventDefault();
+        sendMessage();
+    }
+}
+
+function newChat(){
+    messages = [];
+    document.getElementById("messages").innerHTML = `
+        <div class="empty" id="empty">
+            <div style="font-size:42px">🤖</div>
+            <h2>Xin chào!</h2>
+            <p>Hãy đặt câu hỏi để bắt đầu trò chuyện.</p>
+        </div>`;
+    document.getElementById("input").focus();
+}
+</script>
+</body>
+</html>
